@@ -89,7 +89,7 @@ void ConfigReader::mefn_split(const std::string &text, char delimiter, std::stri
         right = mefn_trim(text.substr(pos + 1));
     }
 }
-int ConfigReader::CConfigValue::as_int() const
+int CConfigValue::as_int() const
 {
     try
     {
@@ -101,7 +101,7 @@ int ConfigReader::CConfigValue::as_int() const
         return -1;
     }
 }
-double ConfigReader::CConfigValue::as_double() const
+double CConfigValue::as_double() const
 {
     try
     {
@@ -113,7 +113,7 @@ double ConfigReader::CConfigValue::as_double() const
         return -1;
     }
 }
-bool ConfigReader::CConfigValue::as_bool() const
+bool CConfigValue::as_bool() const
 {
     try
     {
@@ -125,7 +125,7 @@ bool ConfigReader::CConfigValue::as_bool() const
         return 0;
     }
 }
-std::string ConfigReader::CConfigValue::as_string() const
+std::string CConfigValue::as_string() const
 {
     try
     {
@@ -137,7 +137,7 @@ std::string ConfigReader::CConfigValue::as_string() const
         return "";
     }
 }
-ConfigReader::CConfigValue ConfigReader::CSession::operator[](const std::string &key) const
+CConfigValue CSession::operator[](const std::string &key) const
 {
     try
     {
@@ -153,7 +153,7 @@ ConfigReader::CConfigValue ConfigReader::CSession::operator[](const std::string 
         // std::cerr << e.what() << '\n';
     }
 }
-ConfigReader::CSession ConfigReader::operator[](const std::string &section) const
+CSession ConfigReader::operator[](const std::string &section) const
 {
     try
     {

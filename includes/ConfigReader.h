@@ -4,37 +4,37 @@
 #include <map>
 #include <string>
 #include <fstream>
+class CConfigValue
+{
+private:
+    std::string mes_value;
+
+public:
+    CConfigValue(const std::string &value)
+        : mes_value(value) {}
+
+    int as_int() const;
+
+    double as_double() const;
+
+    bool as_bool() const;
+
+    std::string as_string() const;
+};
+class CSession
+{
+private:
+    const std::map<std::string, std::string> &data;
+
+public:
+    CSession(const std::map<std::string, std::string> &d) : data(d) {}
+
+    CConfigValue operator[](const std::string &key) const;
+};
+
 class ConfigReader
 {
 private:
-    class CConfigValue
-    {
-    private:
-        std::string mes_value;
-
-    public:
-        CConfigValue(const std::string &value)
-            : mes_value(value) {}
-
-        int as_int() const;
-
-        double as_double() const;
-
-        bool as_bool() const;
-
-        std::string as_string() const;
-    };
-    class CSession
-    {
-    private:
-        const std::map<std::string, std::string> &data;
-
-    public:
-        CSession(const std::map<std::string, std::string> &d) : data(d) {}
-
-        CConfigValue operator[](const std::string &key) const;
-    };
-
 public:
     std::map<std::string, std::map<std::string, std::string>> mecm_session_map;
     std::ifstream meC_file;
