@@ -4,6 +4,16 @@
 #include <map>
 #include <string>
 #include <fstream>
+class Array
+{
+    std::vector<std::string> mecV_data;
+
+public:
+    Array(const std::string &data);
+    std::vector<int> as_int();
+    std::vector<double> as_double();
+    std::vector<std::string> as_string();
+};
 class CConfigValue
 {
 private:
@@ -18,7 +28,7 @@ public:
     double as_double() const;
 
     bool as_bool() const;
-
+    Array as_array() const;
     std::string as_string() const;
 };
 class CSession
