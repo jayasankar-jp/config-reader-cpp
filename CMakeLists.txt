@@ -25,13 +25,19 @@ target_include_directories(ConfigReader
 add_library(ConfigReader::ConfigReader ALIAS ConfigReader)
 
 # --------------------------------
-# Test executable
+# Testing
 # --------------------------------
+enable_testing()
 add_executable(test_app
     test/Test.cpp
 )
 
 target_link_libraries(test_app PRIVATE ConfigReader)
+add_test(NAME test_app COMMAND test_app)
+
+# Copy System.ini to build directory for testing
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/build/System.ini DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+
 
 # --------------------------------
 # Install rules (portable)
