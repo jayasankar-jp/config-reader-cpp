@@ -1,251 +1,227 @@
 #include <ConfigReader.h>
 #include <iostream>
-#include <sstream>
-int ConfigReader::mcfn_readConfig(const std::string &file_name)
+#include <fstream>
+#include <algorithm>
+#include <cctype>
+
+std::string_view ConfigReader::mefn_trim_sv(std::string_view str)
 {
-    try
-    {
-        std::string sl_currentSession = "";
-        meC_file.open(file_name);
-        if (meC_file.is_open())
-        {
-            std::string sl_currentLine;
-            while (std::getline(meC_file, sl_currentLine))
-            {
-                // std::cout<<sl_currentLine<<std::endl;
-                sl_currentLine = mefn_trim(sl_currentLine);
-                if (sl_currentLine.length() > 0)
-                {
-                    if (sl_currentLine[0] == '#' || sl_currentLine[0] == ';')
-                    {
-                        // std::cout << "slipiing" << std::endl;
-                        continue;
-                    }
-                    if (sl_currentLine.size() >= 2 && sl_currentLine.front() == '[' && sl_currentLine.back() == ']')
-                    {
-                        sl_currentSession = sl_currentLine.substr(1, sl_currentLine.size() - 2);
-
-                        // std::cout << "Header " << sl_currentLine << sl_currentSession<<std::endl; // abcd
-                    }
-                    else if (sl_currentLine.front() != '[' && sl_currentSession.size() > 0 && sl_currentSession != "")
-                    {
-                        std::string sL_key, sL_value;
-                        std::string temp, result;
-                        if (sl_currentLine.find('#') != std::string::npos)
-                        {
-                            mefn_split(sl_currentLine, '#', result, temp);
-                            sl_currentLine = result;
-                        }
-                        else
-                        {
-                            result = sl_currentLine;
-                        }
-                        if (sl_currentLine.find(';') != std::string::npos)
-                        {
-
-                            mefn_split(sl_currentLine, ';', result, temp);
-                        }
-                        // std::cout << "Data : " << result << std::endl;
-                        if (result.find('=') != std::string::npos)
-                            mefn_split(result, '=', sL_key, sL_value);
-                        else
-                        {
-                            std::cout << "Not a vaild config " << result;
-                            continue;
-                        }
-                        if (sL_key != "")
-                        {
-                            auto cl_it = mecm_session_map.find(sl_currentSession);
-                            if (cl_it != mecm_session_map.end())
-                            {
-                                cl_it->second.insert({sL_key, sL_value});
-                            }
-                            else
-                            {
-                                std::map<std::string, std::string> cl_pairvec;
-                                cl_pairvec.insert({sL_key, sL_value});
-                                mecm_session_map.insert({sl_currentSession, cl_pairvec});
-                            }
-                            // meC_readdData.insert({sL_key, sL_value});
-                            // std::cout << "key: " << sL_key << " value: " << sL_value << std::endl;
-                        }
-                    }
-                }
-                else
-                {
-                    continue;
-                }
-            }
-
-            meC_file.close();
-        }
-        else
-        {
-            return 0;
-        }
-    }
-    catch (const std::exception &e)
-    {
-        std::cerr << e.what() << '\n';
-        return 0;
-    }
-    return 1;
+    const auto first = str.find_first_not_of(" \t\r\n");
+    if (first == std::string_view::npos)
+        return {};
+    const auto last = str.find_last_not_of(" \t\r\n");
+    return str.substr(first, (last - first + 1));
 }
 
 std::string ConfigReader::mefn_trim(const std::string &str)
 {
-    size_t start = str.find_first_not_of(" \t");
-    size_t end = str.find_last_not_of(" \t");
-
-    if (start == std::string::npos)
-        return "";
-
-    return str.substr(start, end - start + 1);
+    return std::string(mefn_trim_sv(str));
 }
+
 void ConfigReader::mefn_split(const std::string &text, char delimiter, std::string &left, std::string &right)
 {
     size_t pos = text.find(delimiter);
-
     if (pos != std::string::npos)
     {
-        left = mefn_trim(text.substr(0, pos));
-        right = mefn_trim(text.substr(pos + 1));
+        left = std::string(mefn_trim_sv(text.substr(0, pos)));
+        right = std::string(mefn_trim_sv(text.substr(pos + 1)));
+    }
+    else
+    {
+        left = std::string(mefn_trim_sv(text));
+        right.clear();
     }
 }
+
+int ConfigReader::mcfn_readConfig(const std::string &file_name)
+{
+    std::ifstream in_file(file_name);
+    if (!in_file.is_open())
+    {
+        return 0;
+    }
+
+    std::string sl_currentSession;
+    std::string line;
+
+    while (std::getline(in_file, line))
+    {
+        std::string_view trimmed = mefn_trim_sv(line);
+        if (trimmed.empty())
+            continue;
+
+        // Skip full line comments
+        if (trimmed.front() == '#' || trimmed.front() == ';')
+            continue;
+
+        // Section header
+        if (trimmed.size() >= 2 && trimmed.front() == '[' && trimmed.back() == ']')
+        {
+            sl_currentSession = std::string(trimmed.substr(1, trimmed.size() - 2));
+            mecm_session_map[sl_currentSession]; // Ensure section exists
+            continue;
+        }
+
+        // Handle inline comments (strip anything after '#' or ';' not inside quotes)
+        bool in_quotes = false;
+        size_t comment_pos = std::string_view::npos;
+        for (size_t i = 0; i < trimmed.size(); ++i)
+        {
+            if (trimmed[i] == '"')
+            {
+                in_quotes = !in_quotes;
+            }
+            else if (!in_quotes && (trimmed[i] == '#' || trimmed[i] == ';'))
+            {
+                comment_pos = i;
+                break;
+            }
+        }
+
+        if (comment_pos != std::string_view::npos)
+        {
+            trimmed = mefn_trim_sv(trimmed.substr(0, comment_pos));
+            if (trimmed.empty())
+                continue;
+        }
+
+        // Key = Value
+        size_t eq_pos = trimmed.find('=');
+        if (eq_pos == std::string_view::npos)
+        {
+            continue;
+        }
+
+        std::string key(mefn_trim_sv(trimmed.substr(0, eq_pos)));
+        std::string value(mefn_trim_sv(trimmed.substr(eq_pos + 1)));
+
+        if (!key.empty())
+        {
+            mecm_session_map[sl_currentSession][key] = value;
+        }
+    }
+
+    return 1;
+}
+
 int CConfigValue::as_int() const
 {
     try
     {
         return std::stoi(mes_value);
     }
-    catch (const std::exception &e)
+    catch (...)
     {
-        // std::cerr << e.what() << '\n';
         return -1;
     }
 }
+
 double CConfigValue::as_double() const
 {
     try
     {
         return std::stod(mes_value);
     }
-    catch (const std::exception &e)
+    catch (...)
     {
-        // std::cerr << e.what() << '\n';
-        return -1;
+        return -1.0;
     }
 }
+
 bool CConfigValue::as_bool() const
 {
-    try
-    {
-        return (mes_value == "true" || mes_value == "1");
-    }
-    catch (const std::exception &e)
-    {
-        // std::cerr << e.what() << '\n';
-        return 0;
-    }
+    std::string temp = mes_value;
+    std::transform(temp.begin(), temp.end(), temp.begin(), [](unsigned char c) { return std::tolower(c); });
+    return (temp == "true" || temp == "1" || temp == "yes");
 }
+
 std::string CConfigValue::as_string() const
 {
-    try
-    {
-        return mes_value;
-    }
-    catch (const std::exception &e)
-    {
-        // std::cerr << e.what() << '\n';
-        return "";
-    }
+    return mes_value;
 }
+
 Array CConfigValue::as_array() const
 {
     return Array(mes_value);
 }
+
 CConfigValue CSession::operator[](const std::string &key) const
 {
-    try
-    {
-        auto it = data.find(key);
-        if (it != data.end())
-            return CConfigValue(it->second);
-
-        return CConfigValue("");
-    }
-    catch (const std::exception &e)
-    {
-        return CConfigValue("");
-        // std::cerr << e.what() << '\n';
-    }
+    auto it = data.find(key);
+    if (it != data.end())
+        return CConfigValue(it->second);
+    return CConfigValue("");
 }
+
 CSession ConfigReader::operator[](const std::string &section) const
 {
-    try
-    {
-        auto it = mecm_session_map.find(section);
-
-        if (it != mecm_session_map.end())
-            return CSession(it->second);
-
-        static std::map<std::string, std::string> empty;
-        return CSession(empty);
-    }
-    catch (const std::exception &e)
-    {
-        // std::cerr << e.what() << '\n';
-        static std::map<std::string, std::string> empty;
-        return CSession(empty);
-    }
+    auto it = mecm_session_map.find(section);
+    if (it != mecm_session_map.end())
+        return CSession(it->second);
+    return CSession();
 }
 
 Array::Array(const std::string &data)
 {
-    if (data.size() >= 2 && data.front() == '[' && data.back() == ']')
+    std::string_view trimmed = ConfigReader::mefn_trim_sv(data);
+    if (trimmed.size() >= 2 && trimmed.front() == '[' && trimmed.back() == ']')
     {
-        std::stringstream ss;
-        ss << data.substr(1, data.size() - 2);
-        std::string singel_data;
-        while (getline(ss, singel_data, ','))
+        trimmed = trimmed.substr(1, trimmed.size() - 2);
+    }
+
+    size_t start = 0;
+    while (start < trimmed.size())
+    {
+        size_t comma_pos = trimmed.find(',', start);
+        if (comma_pos == std::string_view::npos)
         {
-            mecV_data.push_back(singel_data);
+            std::string_view elem = ConfigReader::mefn_trim_sv(trimmed.substr(start));
+            if (!elem.empty())
+                mecV_data.emplace_back(elem);
+            break;
         }
+
+        std::string_view elem = ConfigReader::mefn_trim_sv(trimmed.substr(start, comma_pos - start));
+        mecV_data.emplace_back(elem);
+        start = comma_pos + 1;
     }
 }
-std::vector<int> Array::as_int()
+
+std::vector<int> Array::as_int() const
 {
     std::vector<int> cl_vec;
-    try
+    cl_vec.reserve(mecV_data.size());
+    for (const auto &item : mecV_data)
     {
-        for (auto i : mecV_data)
+        try
         {
-            cl_vec.push_back(std::stoi(i));
+            cl_vec.push_back(std::stoi(item));
         }
-    }
-    catch (const std::exception &e)
-    {
-        std::cerr << e.what() << '\n';
+        catch (...)
+        {
+        }
     }
     return cl_vec;
 }
-std::vector<double> Array::as_double()
+
+std::vector<double> Array::as_double() const
 {
     std::vector<double> cl_vec;
-    try
+    cl_vec.reserve(mecV_data.size());
+    for (const auto &item : mecV_data)
     {
-        for (auto i : mecV_data)
+        try
         {
-            cl_vec.push_back(std::stod(i));
+            cl_vec.push_back(std::stod(item));
         }
-    }
-    catch (const std::exception &e)
-    {
-        std::cerr << e.what() << '\n';
+        catch (...)
+        {
+        }
     }
     return cl_vec;
 }
-std::vector<std::string> Array::as_string()
+
+std::vector<std::string> Array::as_string() const
 {
     return mecV_data;
 }
